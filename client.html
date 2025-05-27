@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WebTransport 非同期BlindX</title>
+  <style>
+    body { font-family: sans-serif; }
+    #output { border: 1px solid red; padding: 10px; margin-top: 10px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>WebTransport 非同期BlindX</h1>
+
+<label for="textInput">送信する文字列:</label>
+<input type="text" id="textInput"/>
+<button onclick="sendMessage()">送信</button>
+
+  <div id="output">ログ出力:</div>
+
+  <script>
+    let transport;
+    let connected = false;
+    /*
+    const startTimes = {};
+    let totalStartTime = null;
+    let totalResponses = 0;
+    let expectedResponses = 10;
+    */
+
+    async function connect(){  //WebTransportでサーバと接続, asyncで非同期
+      const output = document.getElementById("output");
+      output.innerHTML += "Connecting...\n";  //ログを追記
+
+      transport = new WebTransport("https://127.0.0.1:4433/webtransport");
+      await transport.ready;  //awaitで接続完了まで待機
+      output.innerHTML += "Connected!\n";
+      connected = true;
+
+      listenForIncomingStreams();
+    }
+
+    async function listenForIncomingStreams(){   //サーバからの返信を受信
+      for await (const unistream of transport.incomingUnidirectionalStreams) {
+        const reader = unistream.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let result = "";
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          result += decoder.decode(value, { stream: true });
+        }
+        result += decoder.decode();
+
+        /*
+        const [id, payload] = result.split(":", 2);
+        const end = performance.now();
+        const latency = startTimes[id] ? (end - startTimes[id]).toFixed(2) : "N/A";
+
+        appendOutput(`Received from server (ID: ${id}): ${payload}`);
+        appendOutput(`応答時間: ${latency} ms`);
+        */
+
+        appendOutput(`Received from server: ${result}`);
+
+        /*
+        totalResponses++;
+        if (totalResponses === expectedResponses && totalStartTime !== null) {
+          const totalTime = (end - totalStartTime).toFixed(2);
+          const throughput = (expectedResponses / (totalTime / 1000)).toFixed(2);
+          appendOutput(`\n--- スループット結果 ---\n総処理時間: ${totalTime} ms\nスループット: ${throughput} req/sec`);
+        }
+        */
+      }
+    }
+
+    async function sendMessage() {
+      const text = document.getElementById("textInput").value;
+      //const output = document.getElementById("output");
+
+      if (!connected) {
+        await connect();
+      }
+
+      const stream = await transport.createBidirectionalStream();
+      const writer = stream.writable.getWriter();
+
+      /*
+      const id = crypto.randomUUID();
+      startTimes[id] = performance.now();
+      const fullText = `${id}:${text}`;
+      */
+
+      const fullText = text;
+      await writer.write(new TextEncoder().encode(fullText));
+      await writer.close();
+
+      //appendOutput(`Sent to server: ${text} (ID: ${id})`);
+      appendOutput(`Sent to server: ${text}`);
+    }
+
+    function appendOutput(text) {
+      const output = document.getElementById("output");
+      output.innerHTML += "\n" + text;
+    }
+
+    async function sendWithText(text) {
+      if (!connected) {
+        await connect();
+      }
+
+         /*
+    const id = crypto.randomUUID();
+    startTimes[id] = performance.now();
+    const fullText = `${id}:${text}`;
+    */
+
+    const fullText = text;
+
+    //if (totalResponses === 0 && totalStartTime === null) {
+      //totalStartTime = performance.now();
+    //}
+
+    const stream = await transport.createBidirectionalStream();
+    const writer = stream.writable.getWriter();
+    await writer.write(new TextEncoder().encode(fullText));
+    await writer.close();
+
+    //appendOutput(`Sent to server: ${text} (ID: ${id})`);
+      appendOutput(`Sent to server: ${text}`);
+  }
+
+   /*
+  async function sendBatch(inputs, interval = 1000) {
+   expectedResponses = inputs.length;
+   for (let i = 0; i < inputs.length; i++) {
+     await sendWithText(inputs[i]);
+     await new Promise(resolve => setTimeout(resolve, interval));
+     }
+  }
+  */
+  </script>
+</body>
+</html>
